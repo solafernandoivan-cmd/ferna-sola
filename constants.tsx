@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { DrainCategory } from './types';
+import { DrainCategory, Drain } from './types';
 
 export const CATEGORY_CONFIG = {
   [DrainCategory.LARGE]: {
@@ -40,4 +41,21 @@ export const CATEGORY_CONFIG = {
   }
 };
 
-export const INITIAL_DRAINS: any[] = [];
+export const INITIAL_DRAINS: Drain[] = [
+  {
+    id: 'sample-1',
+    name: 'Colector Principal Av. Central',
+    location: 'Intersección Calle 50 con Av. 10',
+    category: DrainCategory.LARGE,
+    frequencyDays: 15,
+    history: []
+  },
+  {
+    id: 'sample-2',
+    name: 'Rejilla Residencial Norte',
+    location: 'Entrada Urbanización Los Pinos',
+    category: DrainCategory.MEDIUM,
+    frequencyDays: 30,
+    history: []
+  }
+];

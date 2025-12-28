@@ -1,11 +1,11 @@
 {
-  "name": "Limpieza Canales",
-  "short_name": "Limpieza Canales",
-  "description": "Sistema profesional de gestión pluvial",
-  "start_url": "./index.html",
+  "name": "Vera Pluvial Pro",
+  "short_name": "Vera",
+  "description": "Sistema profesional de gestión pluvial con IA",
+  "start_url": ".",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#2563eb",
+  "background_color": "#F1F5F9",
+  "theme_color": "#0F172A",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3145/3145024.png",

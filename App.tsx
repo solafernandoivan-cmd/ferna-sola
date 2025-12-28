@@ -56,7 +56,7 @@ const App: React.FC = () => {
     if (drains.length === 0) return;
     setLoadingInsights(true);
     const result = await getMaintenanceInsights(drains);
-    setInsights(result);
+    setInsights(result || "Sin recomendaciones actuales.");
     setLoadingInsights(false);
   }, [drains]);
 
@@ -64,22 +64,14 @@ const App: React.FC = () => {
     fetchInsights();
   }, [drains.length]);
 
-  const handleStatClick = (type: 'all' | 'overdue' | 'health') => {
-    if (type === 'overdue') {
-      setActiveTab('overdue');
-    } else {
-      setActiveTab('all');
-    }
-    
-    // Scroll suave hacia la sección de canales
-    setTimeout(() => {
-      listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  };
-
-  const handleExportCSV = () => {
-    if (drains.length === 0) return alert("No hay datos operativos.");
-    exportToCSV(drains);
+  const handleDownloadBackup = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(drains, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `Vera_Backup_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
   };
 
   const handleAddDrain = (newDrainData: Omit<Drain, 'id' | 'history'>) => {
@@ -92,6 +84,11 @@ const App: React.FC = () => {
     const newRecord: CleaningRecord = { id: Date.now().toString(), date: new Date().toISOString().split('T')[0], notes, performer };
     setDrains(prev => prev.map(d => d.id === id ? { ...d, history: [newRecord, ...d.history] } : d));
     setSelectedDrainId(null);
+  };
+
+  const handleDataRestored = (newData: Drain[], cloudId: string) => {
+    setDrains(newData);
+    setCloudStatus('success');
   };
 
   const filteredDrains = drains.filter(d => {
@@ -107,7 +104,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#F1F5F9] pb-32">
       <Header 
         onExport={() => setIsSyncModalOpen(true)} 
-        onExportCSV={handleExportCSV} 
+        onExportCSV={() => exportToCSV(drains)} 
         onImport={() => {}}
         onShowHelp={() => setIsGuideOpen(true)}
         isSyncing={isSyncingLocal}
@@ -119,7 +116,7 @@ const App: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
           <div>
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Panel Maestro</h2>
-            <p className="text-slate-500 font-medium">Gestión Profesional Pluvial</p>
+            <p className="text-slate-500 font-medium italic">Vera Pluvial Pro &copy;</p>
           </div>
           
           <div className="flex bg-white rounded-2xl shadow-sm border border-slate-200 p-1.5 self-stretch md:self-auto overflow-x-auto no-scrollbar">
@@ -145,10 +142,12 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* MÉTRICAS PRINCIPALES AL PRINCIPIO */}
-        <QuickStats drains={drains} onStatClick={handleStatClick} />
+        <QuickStats drains={drains} onStatClick={(type) => {
+          if (type === 'overdue') setActiveTab('overdue');
+          else setActiveTab('all');
+          listRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }} />
 
-        {/* LISTADO DE CANALES (ZONA OPERATIVA) */}
         <div ref={listRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 scroll-mt-24">
           {filteredDrains.map(drain => (
             <DrainCard 
@@ -171,25 +170,12 @@ const App: React.FC = () => {
               <span className="font-black uppercase tracking-[0.2em] text-sm">Nuevo Canal</span>
             </button>
           )}
-
-          {filteredDrains.length === 0 && activeTab !== 'all' && (
-            <div className="col-span-full py-20 text-center">
-              <div className="bg-slate-100 h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No hay canales en este estado</p>
-              <button onClick={() => setActiveTab('all')} className="mt-4 text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em]">Ver todos los canales</button>
-            </div>
-          )}
         </div>
 
-        {/* CENSO E IA AL FINAL DE TODO */}
         <AnalysisSection drains={drains} insights={insights} loadingInsights={loadingInsights} />
       </main>
 
-      {/* Floating Bottom Navigation */}
+      {/* Navegación Inferior Móvil */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg z-50">
         <div className="bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] p-4 flex justify-between items-center shadow-2xl border border-white/10">
           {[
@@ -211,7 +197,7 @@ const App: React.FC = () => {
       </div>
 
       {isAddDrainOpen && <AddDrainModal onClose={() => setIsAddDrainOpen(false)} onSave={handleAddDrain} />}
-      {isSyncModalOpen && <SyncModal currentData={drains} onClose={() => setIsSyncModalOpen(false)} onDataRestored={(d) => setDrains(d)} onDownloadBackup={() => {}} onExportCSV={handleExportCSV} />}
+      {isSyncModalOpen && <SyncModal currentData={drains} onClose={() => setIsSyncModalOpen(false)} onDataRestored={handleDataRestored} onDownloadBackup={handleDownloadBackup} onExportCSV={() => exportToCSV(drains)} />}
       {isGuideOpen && <GuideModal onClose={() => setIsGuideOpen(false)} />}
       {editDrainId && <EditDrainModal drain={drains.find(d => d.id === editDrainId)!} onClose={() => setEditDrainId(null)} onSave={(id, data) => setDrains(prev => prev.map(d => d.id === id ? {...d, ...data} : d))} />}
       {selectedDrainId && <AddCleaningModal drain={drains.find(d => d.id === selectedDrainId)!} onClose={() => setSelectedDrainId(null)} onSave={handleAddCleaning} />}
