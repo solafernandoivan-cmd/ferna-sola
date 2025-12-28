@@ -30,6 +30,7 @@ export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onVi
   const overdue = lastCleaning ? isOverdue(lastCleaning.date, drain.frequencyDays) : true;
   
   const progress = Math.min(100, Math.max(0, (daysSince / drain.frequencyDays) * 100));
+  const healthPercentage = Math.max(0, 100 - progress);
 
   return (
     <div className={`group bg-white rounded-[2.5rem] overflow-hidden border transition-all duration-300 hover:shadow-2xl ${overdue ? 'border-rose-200 shadow-rose-100/50' : 'border-slate-100 shadow-slate-200/50'}`}>
@@ -95,12 +96,15 @@ export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onVi
             </div>
           </div>
 
-          {/* LA BARRA DE SALUD (CÓDIGO DE BARRAS VISUAL) */}
-          <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner">
+          {/* LA BARRA DE SALUD (CÓDIGO DE BARRAS VISUAL CON ANIMACIÓN SUAVE) */}
+          <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner relative">
             <div 
-              className={`h-full rounded-full transition-all duration-1000 ease-out shadow-sm ${overdue ? 'bg-gradient-to-r from-rose-500 to-rose-400' : 'bg-gradient-to-r from-indigo-600 to-blue-500'}`}
-              style={{ width: `${Math.max(5, 100 - progress)}%` }}
-            ></div>
+              className={`h-full rounded-full shadow-sm transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1) relative ${overdue ? 'bg-gradient-to-r from-rose-600 to-rose-400' : 'bg-gradient-to-r from-indigo-600 to-blue-500'}`}
+              style={{ width: `${healthPercentage}%` }}
+            >
+              {/* Efecto de brillo/shimmer para la barra */}
+              <div className="absolute inset-0 bg-white/20 skew-x-[-20deg] animate-pulse-soft"></div>
+            </div>
           </div>
         </div>
 
