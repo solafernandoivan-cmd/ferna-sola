@@ -17,32 +17,53 @@ export const notificationService = {
   sendNotification: (title: string, body: string) => {
     if (Notification.permission === "granted") {
       try {
-        new Notification(title, {
-          body,
-          icon: "https://cdn-icons-png.flaticon.com/512/3145/3145024.png",
-          badge: "https://cdn-icons-png.flaticon.com/512/3145/3145024.png"
-        });
+        // Usamos el Service Worker si está disponible para una mejor experiencia PWA
+        const icon = "https://cdn-icons-png.flaticon.com/512/3145/3145024.png";
+        
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(registration => {
+            // Fix: Cast options to any as 'vibrate' and 'badge' might be missing from the local NotificationOptions type definition
+            registration.showNotification(title, {
+              body,
+              icon,
+              badge: icon,
+              vibrate: [200, 100, 200],
+              tag: 'mantenimiento-pluvial'
+            } as any);
+          });
+        } else {
+          // Fix: Cast options to any as 'badge' might be missing from the local NotificationOptions type definition
+          new Notification(title, {
+            body,
+            icon,
+            badge: icon,
+            tag: 'mantenimiento-pluvial'
+          } as any);
+        }
       } catch (e) {
         console.error("Error al enviar notificación:", e);
       }
     }
   },
 
+  /**
+   * Verifica todos los canales y envía alertas si están próximos a vencer o vencidos.
+   */
   checkDrainsAndNotify: (drains: Drain[]) => {
     if (Notification.permission !== "granted") return;
 
-    // Evitar spam: solo notificar una vez por sesión o día si es posible
     const today = new Date().toISOString().split('T')[0];
     const notified = JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '{}');
 
     drains.forEach(drain => {
       const lastCleaning = drain.history.length > 0 ? drain.history[0] : null;
-      if (!lastCleaning) return;
-
-      const daysSince = getDaysSince(lastCleaning.date);
+      // Si nunca se ha limpiado, se considera vencido desde el inicio
+      const daysSince = lastCleaning ? getDaysSince(lastCleaning.date) : 999;
       const daysRemaining = drain.frequencyDays - daysSince;
       
-      const notificationId = `${drain.id}-${daysRemaining}-${today}`;
+      const notificationId = `${drain.id}-${daysRemaining <= 0 ? 'overdue' : daysRemaining}-${today}`;
+      
+      // No repetir la misma notificación el mismo día
       if (notified[notificationId]) return;
 
       if (daysRemaining === 3) {
@@ -51,15 +72,25 @@ export const notificationService = {
           `El canal "${drain.name}" requiere limpieza en 3 días.`
         );
         notified[notificationId] = true;
-      } else if (daysRemaining === 0) {
+      } else if (daysRemaining <= 0) {
         notificationService.sendNotification(
-          "🚨 ¡Limpieza Requerida!",
-          `El canal "${drain.name}" ha llegado al límite de su ciclo hoy.`
+          "🚨 ¡ALERTA DE MANTENIMIENTO!",
+          `El plazo de limpieza del canal "${drain.name}" se ha vencido. Acción inmediata requerida.`
         );
         notified[notificationId] = true;
       }
     });
 
     localStorage.setItem(NOTIFIED_KEY, JSON.stringify(notified));
+  },
+
+  /**
+   * Dispara una notificación de prueba que simula un vencimiento real.
+   */
+  simulateOverdueNotification: () => {
+    notificationService.sendNotification(
+      "🚨 SIMULACRO: Limpieza Vencida",
+      "Este es un ejemplo de cómo Vera te avisará cuando un canal pluvial exceda su plazo de mantenimiento."
+    );
   }
 };

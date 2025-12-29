@@ -9,6 +9,7 @@ interface DrainCardProps {
   onAddCleaning: (id: string) => void;
   onViewHistory: (id: string) => void;
   onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 // Icono de rejilla/canal pluvial personalizado
@@ -23,7 +24,7 @@ const DrainIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onViewHistory, onEdit }) => {
+export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onViewHistory, onEdit, onDelete }) => {
   const config = CATEGORY_CONFIG[drain.category];
   const lastCleaning = drain.history.length > 0 ? drain.history[0] : null;
   const daysSince = lastCleaning ? getDaysSince(lastCleaning.date) : 999;
@@ -31,6 +32,12 @@ export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onVi
   
   const progress = Math.min(100, Math.max(0, (daysSince / drain.frequencyDays) * 100));
   const healthPercentage = Math.max(0, 100 - progress);
+
+  const handleDeleteClick = () => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar el canal "${drain.name}"? Esta acción no se puede deshacer.`)) {
+      onDelete(drain.id);
+    }
+  };
 
   return (
     <div className={`group bg-white rounded-[2.5rem] overflow-hidden border transition-all duration-300 hover:shadow-2xl ${overdue ? 'border-rose-200 shadow-rose-100/50' : 'border-slate-100 shadow-slate-200/50'}`}>
@@ -47,6 +54,13 @@ export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onVi
               title="Editar Canal"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className="p-2.5 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl transition-all"
+              title="Eliminar Canal"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </button>
           </div>
         </div>
@@ -73,7 +87,7 @@ export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onVi
           </div>
         </div>
 
-        {/* MÉTRICAS OPERATIVAS (POR ARRIBA DEL CÓDIGO DE BARRAS) */}
+        {/* MÉTRICAS OPERATIVAS */}
         <div className="bg-slate-50/80 rounded-3xl p-5 mb-6 border border-slate-100 relative overflow-hidden">
           {overdue && (
             <div className="absolute top-0 right-0">
@@ -96,13 +110,12 @@ export const DrainCard: React.FC<DrainCardProps> = ({ drain, onAddCleaning, onVi
             </div>
           </div>
 
-          {/* LA BARRA DE SALUD (CÓDIGO DE BARRAS VISUAL CON ANIMACIÓN SUAVE) */}
+          {/* LA BARRA DE SALUD */}
           <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner relative">
             <div 
               className={`h-full rounded-full shadow-sm transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1) relative ${overdue ? 'bg-gradient-to-r from-rose-600 to-rose-400' : 'bg-gradient-to-r from-indigo-600 to-blue-500'}`}
               style={{ width: `${healthPercentage}%` }}
             >
-              {/* Efecto de brillo/shimmer para la barra */}
               <div className="absolute inset-0 bg-white/20 skew-x-[-20deg] animate-pulse-soft"></div>
             </div>
           </div>

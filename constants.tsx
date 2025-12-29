@@ -41,21 +41,5 @@ export const CATEGORY_CONFIG = {
   }
 };
 
-export const INITIAL_DRAINS: Drain[] = [
-  {
-    id: 'sample-1',
-    name: 'Colector Principal Av. Central',
-    location: 'Intersección Calle 50 con Av. 10',
-    category: DrainCategory.LARGE,
-    frequencyDays: 15,
-    history: []
-  },
-  {
-    id: 'sample-2',
-    name: 'Rejilla Residencial Norte',
-    location: 'Entrada Urbanización Los Pinos',
-    category: DrainCategory.MEDIUM,
-    frequencyDays: 30,
-    history: []
-  }
-];
+// Se eliminaron los ejemplos para iniciar con el inventario vacío
+export const INITIAL_DRAINS: Drain[] = [];

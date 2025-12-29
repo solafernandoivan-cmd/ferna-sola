@@ -15,6 +15,7 @@ import { getMaintenanceInsights } from './services/geminiService';
 import { exportToCSV } from './utils/csvExport';
 import { notificationService } from './services/notificationService';
 import { isOverdue } from './utils/dateUtils';
+import { cloudService } from './services/cloudService';
 
 const App: React.FC = () => {
   const [drains, setDrains] = useState<Drain[]>(() => {
@@ -36,24 +37,84 @@ const App: React.FC = () => {
   const [cloudStatus, setCloudStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [lastSync, setLastSync] = useState(() => new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
   
+  // Referencia para evitar bucles de sincronización
+  const lastKnownCloudDataRef = useRef<string>(JSON.stringify(drains));
   const listRef = useRef<HTMLDivElement>(null);
 
-  const saveToLocal = useCallback((data: Drain[]) => {
-    setIsSyncingLocal(true);
-    localStorage.setItem('cunetasvera_drains', JSON.stringify(data));
-    setTimeout(() => {
-      setIsSyncingLocal(false);
-      setLastSync(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-    }, 400);
-  }, []);
-
+  /**
+   * PUSH: Enviar cambios a la nube cuando el usuario modifica algo localmente
+   */
   useEffect(() => {
-    saveToLocal(drains);
-    notificationService.checkDrainsAndNotify(drains);
-  }, [drains, saveToLocal]);
+    const currentDataStr = JSON.stringify(drains);
+    
+    // Solo persistimos si el cambio es diferente a lo que ya sabemos que hay en la nube
+    if (currentDataStr === lastKnownCloudDataRef.current) return;
+
+    const persistData = async () => {
+      setIsSyncingLocal(true);
+      localStorage.setItem('cunetasvera_drains', currentDataStr);
+      
+      const cloudId = localStorage.getItem('cloud_sync_id');
+      if (cloudId) {
+        setCloudStatus('syncing');
+        try {
+          await cloudService.updateCloud(cloudId, drains);
+          lastKnownCloudDataRef.current = currentDataStr;
+          setCloudStatus('success');
+          setTimeout(() => setCloudStatus('idle'), 3000);
+        } catch (err) {
+          console.error("Error en autosincronización nube:", err);
+          setCloudStatus('error');
+        }
+      }
+
+      setLastSync(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+      setIsSyncingLocal(false);
+      notificationService.checkDrainsAndNotify(drains);
+    };
+
+    const timeout = setTimeout(persistData, 1000); // Debounce de 1s para no saturar la API
+    return () => clearTimeout(timeout);
+  }, [drains]);
+
+  /**
+   * PULL: Ciclo de actualización automática desde otros dispositivos
+   */
+  useEffect(() => {
+    const cloudId = localStorage.getItem('cloud_sync_id');
+    if (!cloudId) return;
+
+    const checkForRemoteUpdates = async () => {
+      try {
+        const remoteData = await cloudService.pullFromCloud(cloudId);
+        const remoteDataStr = JSON.stringify(remoteData);
+        
+        // Si los datos remotos son diferentes a los locales, actualizamos
+        if (remoteDataStr !== JSON.stringify(drains)) {
+          console.log("Detectados cambios remotos, actualizando dispositivo...");
+          lastKnownCloudDataRef.current = remoteDataStr;
+          setDrains(remoteData);
+          setCloudStatus('success');
+          setTimeout(() => setCloudStatus('idle'), 2000);
+        }
+      } catch (err) {
+        console.warn("Fallo en verificación de actualizaciones remotas:", err);
+      }
+    };
+
+    // Verificación inicial al montar
+    checkForRemoteUpdates();
+
+    // Polling cada 20 segundos
+    const interval = setInterval(checkForRemoteUpdates, 20000);
+    return () => clearInterval(interval);
+  }, [drains]); // Re-suscribir si los drains cambian para mantener el closure fresco
 
   const fetchInsights = useCallback(async () => {
-    if (drains.length === 0) return;
+    if (drains.length === 0) {
+      setInsights("No hay canales registrados para analizar.");
+      return;
+    }
     setLoadingInsights(true);
     const result = await getMaintenanceInsights(drains);
     setInsights(result || "Sin recomendaciones actuales.");
@@ -80,6 +141,10 @@ const App: React.FC = () => {
     setIsAddDrainOpen(false);
   };
 
+  const handleDeleteDrain = (id: string) => {
+    setDrains(prev => prev.filter(d => d.id !== id));
+  };
+
   const handleAddCleaning = (id: string, notes: string, performer: string) => {
     const newRecord: CleaningRecord = { id: Date.now().toString(), date: new Date().toISOString().split('T')[0], notes, performer };
     setDrains(prev => prev.map(d => d.id === id ? { ...d, history: [newRecord, ...d.history] } : d));
@@ -87,6 +152,8 @@ const App: React.FC = () => {
   };
 
   const handleDataRestored = (newData: Drain[], cloudId: string) => {
+    localStorage.setItem('cloud_sync_id', cloudId);
+    lastKnownCloudDataRef.current = JSON.stringify(newData);
     setDrains(newData);
     setCloudStatus('success');
   };
@@ -156,6 +223,7 @@ const App: React.FC = () => {
               onAddCleaning={(id) => setSelectedDrainId(id)} 
               onViewHistory={(id) => setViewHistoryDrainId(id)}
               onEdit={(id) => setEditDrainId(id)}
+              onDelete={handleDeleteDrain}
             />
           ))}
           
